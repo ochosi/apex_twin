@@ -250,14 +250,12 @@
       <div id="loading" class="status-msg hidden"><span class="spinner"></span> Loading details&hellip;</div>
       <div id="empty-state" class="status-msg">Search for someone above to see their details.</div>
       <div id="fields" class="field-grid hidden">
-        <div class="field"><label>Noble Title</label><div class="value" data-field="nobleTitle"></div></div>
-        <div class="field"><label>Sex / Gender</label><div class="value" data-field="sex"></div></div>
-        <div class="field"><label>Given Name</label><div class="value" data-field="givenName"></div></div>
-        <div class="field"><label>Family Name</label><div class="value" data-field="familyName"></div></div>
+        <div class="field"><label>Name (Lemma1)</label><div class="value" data-field="familyName"></div></div>
+        <div class="field"><label>Rufname (Lemma2)</label><div class="value" data-field="givenName"></div></div>
+        <div class="field"><label>Namenszus&auml;tze (Lemma3)</label><div class="value" data-field="nobleTitle"></div></div>
+        <div class="field"><label>Gender</label><div class="value" data-field="sexDisplay"></div></div>
         <div class="field"><label>Date of Birth</label><div class="value" data-field="dob"></div></div>
         <div class="field"><label>Date of Death</label><div class="value" data-field="dod"></div></div>
-        <div class="field"><label>Place of Birth</label><div class="value" data-field="pob"></div></div>
-        <div class="field"><label>Place of Death</label><div class="value" data-field="pod"></div></div>
       </div>
     </div>
 
@@ -274,18 +272,24 @@
 
 <script>
 (function () {
-  /* ── APEX configuration (replace with your real values) ── */
-  const APEX_BASE   = 'https://apex.oracle.com/pls/apex/f';
-  const APEX_APP    = '100';
+  /* ── APEX configuration ── */
+  const APEX_BASE   = 'https://apex.dla-marbach.de:55022/apex/f';
+  const APEX_APP    = '150';
   const APEX_PAGE   = '2';
   const APEX_ITEMS  = [
-    'P2_NOBLE_TITLE', 'P2_FAMILY_NAME', 'P2_GIVEN_NAME', 'P2_SEX',
-    'P2_DOB', 'P2_DOD', 'P2_POB', 'P2_POD'
+    'P2_LEMMA1', 'P2_LEMMA2', 'P2_LEMMA3', 'P2_LEMMA4',
+    'P2_GENDER',
+    'P2_VONTAG', 'P2_VONMONAT', 'P2_VONJAHR',
+    'P2_BISTAG', 'P2_BISMONAT', 'P2_BISJAHR',
+    'P2_REGISTER', 'P2_SORTIERFELD'
   ];
   /* Field keys must match the order of APEX_ITEMS */
   const FIELD_KEYS = [
-    'nobleTitle', 'familyName', 'givenName', 'sex',
-    'dob', 'dod', 'pob', 'pod'
+    'familyName', 'givenName', 'nobleTitle', 'givenName',
+    'sex',
+    'dobDay', 'dobMonth', 'dobYear',
+    'dodDay', 'dodMonth', 'dodYear',
+    'register', 'sortField'
   ];
 
   /* ── DOM refs ── */
@@ -356,7 +360,7 @@
     showLoading();
     const sparql = `
 SELECT ?nobleTitleLabel ?familyNameLabel ?givenNameLabel
-       ?sexLabel ?dob ?dod ?pobLabel ?podLabel
+       ?sexLabel ?dob ?dod
 WHERE {
   BIND(wd:${qid} AS ?item)
   OPTIONAL { ?item wdt:P97  ?nobleTitle. }
@@ -365,8 +369,6 @@ WHERE {
   OPTIONAL { ?item wdt:P21  ?sex. }
   OPTIONAL { ?item wdt:P569 ?dob. }
   OPTIONAL { ?item wdt:P570 ?dod. }
-  OPTIONAL { ?item wdt:P19  ?pob. }
-  OPTIONAL { ?item wdt:P20  ?pod. }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 }
 LIMIT 1`;
@@ -377,15 +379,27 @@ LIMIT 1`;
       const json = await res.json();
       const row = (json.results.bindings || [])[0] || {};
 
+      const dobParts = splitDate(val(row.dob));
+      const dodParts = splitDate(val(row.dod));
+      const familyName = val(row.familyNameLabel);
+      const givenName  = val(row.givenNameLabel);
+
       currentData = {
         nobleTitle: val(row.nobleTitleLabel),
-        familyName: val(row.familyNameLabel),
-        givenName:  val(row.givenNameLabel),
-        sex:        val(row.sexLabel),
+        familyName: familyName,
+        givenName:  givenName,
+        sex:        mapGender(val(row.sexLabel)),
+        sexDisplay: val(row.sexLabel),
         dob:        formatDate(val(row.dob)),
         dod:        formatDate(val(row.dod)),
-        pob:        val(row.pobLabel),
-        pod:        val(row.podLabel),
+        dobDay:     dobParts.day,
+        dobMonth:   dobParts.month,
+        dobYear:    dobParts.year,
+        dodDay:     dodParts.day,
+        dodMonth:   dodParts.month,
+        dodYear:    dodParts.year,
+        register:   'Personen',
+        sortField:  [familyName, givenName, dobParts.year].filter(Boolean).join(' '),
       };
 
       renderFields(qid, label);
@@ -405,6 +419,24 @@ LIMIT 1`;
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function splitDate(iso) {
+    if (!iso) return { day: '', month: '', year: '' };
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { day: '', month: '', year: '' };
+    return {
+      day:   String(d.getUTCDate()).padStart(2, '0'),
+      month: String(d.getUTCMonth() + 1).padStart(2, '0'),
+      year:  String(d.getUTCFullYear()),
+    };
+  }
+
+  function mapGender(wikidataLabel) {
+    const lower = (wikidataLabel || '').toLowerCase();
+    if (lower === 'male')   return 'm';
+    if (lower === 'female') return 'w';
+    return 'non';
   }
 
   /* ── Render ── */
