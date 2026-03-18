@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wikidata to AMIE</title>
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --surface: #ffffff;
+      --border: #dfe3eb;
+      --text: #1e2a3a;
+      --text-secondary: #5a6a7e;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-light: #eff4ff;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-lg: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    .container {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .search-wrapper {
+      position: relative;
+      max-width: 560px;
+    }
+
+    .search-wrapper input {
+      width: 100%;
+      padding: .75rem 1rem .75rem 2.5rem;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .search-wrapper input:focus { border-color: var(--accent); }
+
+    .search-wrapper .icon {
+      position: absolute;
+      left: .75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      pointer-events: none;
+    }
+
+    .dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      max-height: 320px;
+      overflow-y: auto;
+      z-index: 10;
+      display: none;
+    }
+
+    .dropdown.open { display: block; }
+
+    .dropdown-item {
+      padding: .65rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover { background: var(--accent-light); }
+
+    .dropdown-item .label { font-weight: 500; }
+
+    .dropdown-item .desc {
+      font-size: .85rem;
+      color: var(--text-secondary);
+    }
+
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem 1.5rem;
+    }
+
+    .field label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text-secondary);
+      margin-bottom: .2rem;
+    }
+
+    .field .value {
+      font-size: .95rem;
+      min-height: 1.4em;
+      color: var(--text);
+    }
+
+    .field .value.empty { color: var(--text-secondary); font-style: italic; }
+
+    .apex-section { position: sticky; top: 2rem; }
+
+    .apex-link {
+      display: block;
+      text-align: center;
+      padding: .85rem 1.5rem;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background .15s;
+      margin-top: 1rem;
+    }
+
+    .apex-link:hover { background: var(--accent-hover); }
+
+    .apex-link.disabled {
+      background: var(--border);
+      color: var(--text-secondary);
+      pointer-events: none;
+    }
+
+    .apex-url-preview {
+      margin-top: .75rem;
+      padding: .75rem;
+      background: var(--bg);
+      border-radius: var(--radius);
+      font-size: .75rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+      word-break: break-all;
+      color: var(--text-secondary);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: .4rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    .status-msg {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .wiki-id {
+      font-size: .8rem;
+      color: var(--text-secondary);
+      margin-bottom: .25rem;
+    }
+
+    .wiki-id a { color: var(--accent); text-decoration: none; }
+    .wiki-id a:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .columns { grid-template-columns: 1fr; }
+      .field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Wikidata <span>&rarr;</span> AMIE</h1>
+</header>
+
+<div class="container">
+  <div class="search-wrapper">
+    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="search" placeholder="Search for a historical person&hellip;" autocomplete="off">
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+
+  <div class="columns">
+    <div class="card" id="detail-card">
+      <h2 id="person-name">Person Details</h2>
+      <div id="wiki-id" class="wiki-id hidden"></div>
+      <div id="loading" class="status-msg hidden"><span class="spinner"></span> Loading details&hellip;</div>
+      <div id="empty-state" class="status-msg">Search for someone above to see their details.</div>
+      <div id="fields" class="field-grid hidden">
+        <div class="field"><label>Noble Title</label><div class="value" data-field="nobleTitle"></div></div>
+        <div class="field"><label>Sex / Gender</label><div class="value" data-field="sex"></div></div>
+        <div class="field"><label>Given Name</label><div class="value" data-field="givenName"></div></div>
+        <div class="field"><label>Family Name</label><div class="value" data-field="familyName"></div></div>
+        <div class="field"><label>Date of Birth</label><div class="value" data-field="dob"></div></div>
+        <div class="field"><label>Date of Death</label><div class="value" data-field="dod"></div></div>
+        <div class="field"><label>Place of Birth</label><div class="value" data-field="pob"></div></div>
+        <div class="field"><label>Place of Death</label><div class="value" data-field="pod"></div></div>
+      </div>
+    </div>
+
+    <div class="apex-section">
+      <div class="card">
+        <h2>AMIE</h2>
+        <p style="font-size:.9rem;color:var(--text-secondary);">Select a person to generate a link that opens AMIE with a pre-filled form.</p>
+        <a id="apex-link" class="apex-link disabled" href="#" target="_blank" rel="noopener">Open in AMIE</a>
+        <div id="apex-url-preview" class="apex-url-preview hidden"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ── APEX configuration (replace with your real values) ── */
+  const APEX_BASE   = 'https://apex.oracle.com/pls/apex/f';
+  const APEX_APP    = '100';
+  const APEX_PAGE   = '2';
+  const APEX_ITEMS  = [
+    'P2_NOBLE_TITLE', 'P2_FAMILY_NAME', 'P2_GIVEN_NAME', 'P2_SEX',
+    'P2_DOB', 'P2_DOD', 'P2_POB', 'P2_POD'
+  ];
+  /* Field keys must match the order of APEX_ITEMS */
+  const FIELD_KEYS = [
+    'nobleTitle', 'familyName', 'givenName', 'sex',
+    'dob', 'dod', 'pob', 'pod'
+  ];
+
+  /* ── DOM refs ── */
+  const searchInput   = document.getElementById('search');
+  const dropdown      = document.getElementById('dropdown');
+  const fieldsEl      = document.getElementById('fields');
+  const loadingEl     = document.getElementById('loading');
+  const emptyEl       = document.getElementById('empty-state');
+  const personNameEl  = document.getElementById('person-name');
+  const wikiIdEl      = document.getElementById('wiki-id');
+  const apexLinkEl    = document.getElementById('apex-link');
+  const apexPreviewEl = document.getElementById('apex-url-preview');
+
+  let debounceTimer = null;
+  let currentData   = {};
+
+  /* ── Search (wbsearchentities) ── */
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { closeDropdown(); return; }
+    debounceTimer = setTimeout(() => searchWikidata(q), 300);
+  });
+
+  async function searchWikidata(term) {
+    const url = 'https://www.wikidata.org/w/api.php?action=wbsearchentities'
+      + '&search=' + encodeURIComponent(term)
+      + '&language=en&uselang=en&type=item&limit=10&format=json&origin=*';
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      renderDropdown(json.search || []);
+    } catch (err) {
+      console.error('Search failed:', err);
+      closeDropdown();
+    }
+  }
+
+  function renderDropdown(items) {
+    if (!items.length) { closeDropdown(); return; }
+    dropdown.innerHTML = items.map(item =>
+      `<div class="dropdown-item" data-id="${item.id}">
+        <div class="label">${esc(item.label)}</div>
+        <div class="desc">${esc(item.description || '')}</div>
+      </div>`
+    ).join('');
+    dropdown.classList.add('open');
+
+    dropdown.querySelectorAll('.dropdown-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.id;
+        const label = el.querySelector('.label').textContent;
+        searchInput.value = label;
+        closeDropdown();
+        fetchDetails(id, label);
+      });
+    });
+  }
+
+  function closeDropdown() { dropdown.classList.remove('open'); }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrapper')) closeDropdown();
+  });
+
+  /* ── Detail fetch (SPARQL) ── */
+  async function fetchDetails(qid, label) {
+    showLoading();
+    const sparql = `
+SELECT ?nobleTitleLabel ?familyNameLabel ?givenNameLabel
+       ?sexLabel ?dob ?dod ?pobLabel ?podLabel
+WHERE {
+  BIND(wd:${qid} AS ?item)
+  OPTIONAL { ?item wdt:P97  ?nobleTitle. }
+  OPTIONAL { ?item wdt:P734 ?familyName. }
+  OPTIONAL { ?item wdt:P735 ?givenName. }
+  OPTIONAL { ?item wdt:P21  ?sex. }
+  OPTIONAL { ?item wdt:P569 ?dob. }
+  OPTIONAL { ?item wdt:P570 ?dod. }
+  OPTIONAL { ?item wdt:P19  ?pob. }
+  OPTIONAL { ?item wdt:P20  ?pod. }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+}
+LIMIT 1`;
+
+    try {
+      const url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(sparql);
+      const res = await fetch(url);
+      const json = await res.json();
+      const row = (json.results.bindings || [])[0] || {};
+
+      currentData = {
+        nobleTitle: val(row.nobleTitleLabel),
+        familyName: val(row.familyNameLabel),
+        givenName:  val(row.givenNameLabel),
+        sex:        val(row.sexLabel),
+        dob:        formatDate(val(row.dob)),
+        dod:        formatDate(val(row.dod)),
+        pob:        val(row.pobLabel),
+        pod:        val(row.podLabel),
+      };
+
+      renderFields(qid, label);
+    } catch (err) {
+      console.error('SPARQL query failed:', err);
+      emptyEl.textContent = 'Failed to load details. Please try again.';
+      showEmpty();
+    }
+  }
+
+  function val(binding) {
+    return binding ? binding.value : '';
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  /* ── Render ── */
+  function renderFields(qid, label) {
+    personNameEl.textContent = label;
+    wikiIdEl.innerHTML = `<a href="https://www.wikidata.org/wiki/${qid}" target="_blank" rel="noopener">${qid}</a>`;
+    wikiIdEl.classList.remove('hidden');
+
+    document.querySelectorAll('#fields .value').forEach(el => {
+      const key = el.dataset.field;
+      const v = currentData[key] || '';
+      el.textContent = v || '—';
+      el.classList.toggle('empty', !v);
+    });
+
+    loadingEl.classList.add('hidden');
+    emptyEl.classList.add('hidden');
+    fieldsEl.classList.remove('hidden');
+
+    buildApexLink();
+  }
+
+  function showLoading() {
+    fieldsEl.classList.add('hidden');
+    emptyEl.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+    wikiIdEl.classList.add('hidden');
+    personNameEl.textContent = 'Loading\u2026';
+    apexLinkEl.classList.add('disabled');
+    apexLinkEl.href = '#';
+    apexPreviewEl.classList.add('hidden');
+  }
+
+  function showEmpty() {
+    fieldsEl.classList.add('hidden');
+    loadingEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+  }
+
+  /* ── APEX URL builder ── */
+  function buildApexLink() {
+    const values = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || ''));
+    const itemNames = APEX_ITEMS.join(',');
+    const itemValues = values.join(',');
+    const url = `${APEX_BASE}?p=${APEX_APP}:${APEX_PAGE}:::::${itemNames}:${itemValues}`;
+
+    apexLinkEl.href = url;
+    apexLinkEl.classList.remove('disabled');
+    apexPreviewEl.textContent = url;
+    apexPreviewEl.classList.remove('hidden');
+  }
+
+  /* ── Utility ── */
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+})();
+</script>
+
+</body>
+</html>
