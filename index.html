@@ -279,7 +279,7 @@
     'P2_GENDER',
     'P2_VONTAG', 'P2_VONMONAT', 'P2_VONJAHR',
     'P2_BISTAG', 'P2_BISMONAT', 'P2_BISJAHR',
-    'P2_REGISTER', 'P2_SORTIERFELD'
+    'P2_REGISTER', 'P2_BEARBEITER', 'P2_SORTIERFELD'
   ];
   /* Field keys must match the order of APEX_ITEMS */
   const FIELD_KEYS = [
@@ -287,7 +287,7 @@
     'sex',
     'dobDay', 'dobMonth', 'dobYear',
     'dodDay', 'dodMonth', 'dodYear',
-    'register', 'sortField'
+    'register', 'bearbeiter', 'sortField'
   ];
 
   /* ── DOM refs ── */
@@ -397,7 +397,8 @@ LIMIT 1`;
         dodMonth:   dodParts.month,
         dodYear:    dodParts.year,
         register:   'Personen',
-        sortField:  [familyName, givenName, dobParts.year].filter(Boolean).join(' '),
+        bearbeiter: 'XCD',
+        sortField:  removeDiacritics([familyName, givenName, dobParts.year].filter(Boolean).join(' ')),
       };
 
       renderFields(qid, label);
@@ -428,6 +429,10 @@ LIMIT 1`;
       month: String(d.getUTCMonth() + 1).padStart(2, '0'),
       year:  String(d.getUTCFullYear()),
     };
+  }
+
+  function removeDiacritics(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   function mapGender(wikidataLabel) {
