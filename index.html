@@ -273,9 +273,7 @@
 <script>
 (function () {
   /* ── APEX configuration ── */
-  const APEX_BASE   = 'https://apex.dla-marbach.de:55022/apex/f';
-  const APEX_APP    = '150';
-  const APEX_PAGE   = '2';
+  const APEX_BASE_URL = 'https://apex.dla-marbach.de:55022/apex/f?p=150:2:5883423803655::NO:2';
   const APEX_ITEMS  = [
     'P2_LEMMA1', 'P2_LEMMA2', 'P2_LEMMA3', 'P2_LEMMA4',
     'P2_GENDER',
@@ -481,7 +479,7 @@ LIMIT 1`;
     const values = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || ''));
     const itemNames = APEX_ITEMS.join(',');
     const itemValues = values.join(',');
-    const url = `${APEX_BASE}?p=${APEX_APP}:${APEX_PAGE}:::::${itemNames}:${itemValues}`;
+    const url = `${APEX_BASE_URL}:${itemNames}:${itemValues}`;
 
     apexLinkEl.href = url;
     apexLinkEl.classList.remove('disabled');
