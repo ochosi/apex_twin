@@ -915,12 +915,12 @@ SELECT ?coords WHERE {
         currentData.register || 'Orte',
         currentData.bearbeiter || 'XCD',
         currentData.sortField || '',
-      ].map(encodeURIComponent);
+      ].map(encodeApexValue);
       itemNames  = items.join(',');
       itemValues = vals.join(',');
     } else {
       itemNames  = APEX_ITEMS.join(',');
-      itemValues = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || '')).join(',');
+      itemValues = FIELD_KEYS.map(k => encodeApexValue(currentData[k] || '')).join(',');
     }
 
     const url = `${apexBaseUrl()}:${itemNames}:${itemValues}`;
@@ -941,9 +941,9 @@ SELECT ?coords WHERE {
     const items = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
     let values;
     if (currentMode === 'places') {
-      values = [lid, 'Geodaten', currentCoords, '100'].map(encodeURIComponent).join(',');
+      values = [lid, 'Geodaten', currentCoords, '100'].map(encodeApexValue).join(',');
     } else {
-      values = [lid, 'Wikidata', currentQID, '100'].map(encodeURIComponent).join(',');
+      values = [lid, 'Wikidata', currentQID, '100'].map(encodeApexValue).join(',');
     }
     const url = `${apexNdBase()}:${items}:${values}`;
     ndLinkEl.href = url;
@@ -971,6 +971,14 @@ SELECT ?coords WHERE {
   updateSessionUI();
 
   /* ── Utility ── */
+  function encodeApexValue(value) {
+    var str = String(value);
+    if (str.includes(',')) {
+      return '%5C' + str.split(',').map(function(p) { return encodeURIComponent(p); }).join(',') + '%5C';
+    }
+    return encodeURIComponent(str);
+  }
+
   function esc(str) {
     const d = document.createElement('div');
     d.textContent = str;
