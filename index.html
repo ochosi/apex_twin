@@ -33,6 +33,42 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header-login {
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .header-login .apex-link {
+      display: inline-block;
+      padding: .45rem 1rem;
+      font-size: .85rem;
+      margin-top: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .header-login input {
+      width: 280px;
+      padding: .45rem .75rem;
+      font-size: .85rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s, background .15s;
+    }
+
+    .header-login input:focus {
+      border-color: var(--accent);
     }
 
     header h1 {
@@ -313,6 +349,8 @@
       .columns { grid-template-columns: 1fr; }
       .field-grid { grid-template-columns: 1fr; }
       .normdatum-section .inline-fields { flex-direction: column; }
+      .header-login { width: 100%; }
+      .header-login input { flex: 1; min-width: 0; width: auto; }
     }
   </style>
 </head>
@@ -320,20 +358,13 @@
 
 <header>
   <h1>Wikidata <span>&rarr;</span> AMIE</h1>
+  <div class="header-login">
+    <input type="text" id="apex-session" placeholder="Paste AMIE URL to connect session&hellip;" autocomplete="off">
+    <a id="login-btn" class="apex-link" href="https://apex.dla-marbach.de:55022/apex/f?p=150" onclick="return openAmie(this.href)" style="background:var(--text-secondary);">Login to AMIE</a>
+  </div>
 </header>
 
 <div class="container">
-  <div class="card" id="login-card" style="margin-bottom:1.5rem">
-    <h2>Step 0: Connect to AMIE</h2>
-    <p style="font-size:.9rem;color:var(--text-secondary);margin-bottom:1rem;">Log in to AMIE first, then paste the URL from the address bar to connect your session.</p>
-    <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
-      <a class="apex-link" href="https://apex.dla-marbach.de:55022/apex/f?p=150" onclick="return openAmie(this.href)" style="background:var(--text-secondary);margin-top:0;white-space:nowrap;flex-shrink:0;">Login to AMIE</a>
-      <div style="flex:1;min-width:250px;position:relative;">
-        <label for="apex-session" style="display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:.3rem;">Session</label>
-        <input type="text" id="apex-session" placeholder="Paste the AMIE URL from the address bar&hellip;" autocomplete="off" style="width:100%;padding:.6rem .75rem;font-size:.85rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);outline:none;transition:border-color .15s,background .15s;">
-      </div>
-    </div>
-  </div>
 
   <div id="main-content" class="locked">
   <div class="search-wrapper">
@@ -431,6 +462,9 @@
     input.style.borderColor = valid ? '#16a34a' : '';
     input.style.background = valid ? '#f0fdf4' : '';
     document.getElementById('main-content').classList.toggle('locked', !valid);
+    const loginBtn = document.getElementById('login-btn');
+    loginBtn.style.opacity = valid ? '0.45' : '';
+    loginBtn.style.pointerEvents = valid ? 'none' : '';
   }
 
   function apexBaseUrl() {
