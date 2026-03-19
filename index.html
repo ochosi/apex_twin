@@ -569,7 +569,10 @@
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
     if (q.length < 2) { closeDropdown(); return; }
-    debounceTimer = setTimeout(() => searchWikidata(q), 300);
+    debounceTimer = setTimeout(() => {
+      if (currentMode === 'places') searchNominatim(q);
+      else searchWikidata(q);
+    }, 300);
   });
 
   async function searchWikidata(term) {
@@ -584,6 +587,44 @@
       console.error('Search failed:', err);
       closeDropdown();
     }
+  }
+
+  async function searchNominatim(term) {
+    const url = 'https://nominatim.openstreetmap.org/search?q='
+      + encodeURIComponent(term)
+      + '&format=json&limit=10&addressdetails=1&accept-language=de';
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'WikidataToAMIE/1.0' }
+      });
+      const results = await res.json();
+      renderLocationDropdown(results);
+    } catch (err) {
+      console.error('Nominatim search failed:', err);
+      closeDropdown();
+    }
+  }
+
+  function renderLocationDropdown(items) {
+    if (!items.length) { closeDropdown(); return; }
+    dropdown.innerHTML = items.map(item =>
+      `<div class="dropdown-item" data-lat="${item.lat}" data-lon="${item.lon}" data-name="${esc(item.name || item.display_name)}">
+        <div class="label">${esc(item.display_name)}</div>
+        <div class="desc">${esc(item.type || '')}</div>
+      </div>`
+    ).join('');
+    dropdown.classList.add('open');
+
+    dropdown.querySelectorAll('.dropdown-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const name = el.dataset.name;
+        const lat = el.dataset.lat;
+        const lon = el.dataset.lon;
+        searchInput.value = name;
+        closeDropdown();
+        applyLocationFromNominatim(name, lat, lon);
+      });
+    });
   }
 
   function renderDropdown(items) {
@@ -787,6 +828,56 @@ SELECT ?coords WHERE {
     const m = wkt.match(/Point\(([^ ]+) ([^ ]+)\)/i);
     if (!m) return '';
     return m[2] + ', ' + m[1];
+  }
+
+  function applyLocationFromNominatim(name, lat, lon) {
+    const coords = lat + ', ' + lon;
+    currentData = {
+      locationName: name,
+      coordinates: coords,
+      register: 'Orte',
+      bearbeiter: 'XCD',
+      sortField: removeDiacritics(name),
+    };
+    currentCoords = coords;
+    currentQID = '';
+    renderLocationFieldsOSM(name, lat, lon);
+  }
+
+  function renderLocationFieldsOSM(label, lat, lon) {
+    locationNameEl.textContent = label;
+    const osmUrl = 'https://www.openstreetmap.org/#map=12/' + lat + '/' + lon;
+    locationWikiIdEl.innerHTML = `<a href="${osmUrl}" target="_blank" rel="noopener">View on OpenStreetMap</a>`;
+    locationWikiIdEl.classList.remove('hidden');
+
+    locNameValue.textContent = label;
+    locNameValue.classList.remove('empty');
+
+    const coords = currentData.coordinates || '';
+    locCoordsValue.textContent = coords || '\u2014';
+    locCoordsValue.classList.toggle('empty', !coords);
+
+    if (coords) {
+      const fLat = parseFloat(lat);
+      const fLon = parseFloat(lon);
+      locMapIframe.src = 'https://www.openstreetmap.org/export/embed.html?bbox='
+        + (fLon - 0.05) + ',' + (fLat - 0.05) + ',' + (fLon + 0.05) + ',' + (fLat + 0.05)
+        + '&layer=mapnik&marker=' + fLat + ',' + fLon;
+      locationMapEl.classList.remove('hidden');
+    } else {
+      locationMapEl.classList.add('hidden');
+      locMapIframe.src = '';
+    }
+
+    locationLoadingEl.classList.add('hidden');
+    locationEmptyEl.classList.add('hidden');
+    locationFieldsEl.classList.remove('hidden');
+
+    buildApexLink();
+
+    ndQidDisplay.textContent = coords || '\u2014';
+    ndQidDisplay.classList.toggle('empty', !coords);
+    buildNormdatumLink();
   }
 
   function renderLocationFields(qid, label) {
