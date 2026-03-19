@@ -321,7 +321,12 @@
       <div class="card">
         <h2>AMIE</h2>
         <p style="font-size:.9rem;color:var(--text-secondary);">Select a person to generate a link that opens AMIE with a pre-filled form.</p>
-        <a id="apex-link" class="apex-link disabled" href="#" target="_blank" rel="noopener">Open in AMIE</a>
+        <a class="apex-link" href="https://apex.dla-marbach.de:55022/apex/f?p=150" onclick="return openAmie(this.href)" style="background:var(--text-secondary);">Login to AMIE</a>
+        <div style="margin-top:.75rem">
+          <label for="apex-session" style="display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:.3rem;">Session (paste AMIE URL after login)</label>
+          <input type="text" id="apex-session" placeholder="Paste the AMIE URL from the address bar&hellip;" autocomplete="off" style="width:100%;padding:.6rem .75rem;font-size:.85rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);outline:none;">
+        </div>
+        <a id="apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Open in AMIE</a>
         <div id="apex-url-preview" class="apex-url-preview hidden"></div>
       </div>
     </div>
@@ -348,7 +353,7 @@
           <div class="readonly-value">gewiss</div>
         </div>
       </div>
-      <a id="nd-apex-link" class="apex-link disabled" href="#" target="_blank" rel="noopener">Open Normdatum in AMIE</a>
+      <a id="nd-apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Open Normdatum in AMIE</a>
       <div id="nd-url-preview" class="apex-url-preview hidden"></div>
     </div>
   </div>
@@ -357,9 +362,18 @@
 <script>
 (function () {
   /* ── APEX configuration ── */
-  const APEX_SESSION  = '5883423803655';
-  const APEX_BASE_URL = `https://apex.dla-marbach.de:55022/apex/f?p=150:2:${APEX_SESSION}::NO:2`;
-  const APEX_ND_BASE  = `https://apex.dla-marbach.de:55022/apex/f?p=150:14:${APEX_SESSION}::NO:14`;
+  let apexSession = '0';
+
+  function hasSession() {
+    return apexSession !== '0' && /^\d+$/.test(apexSession);
+  }
+
+  function apexBaseUrl() {
+    return `https://apex.dla-marbach.de:55022/apex/f?p=150:2:${apexSession}::NO:2`;
+  }
+  function apexNdBase() {
+    return `https://apex.dla-marbach.de:55022/apex/f?p=150:14:${apexSession}::NO:14`;
+  }
   const APEX_ITEMS  = [
     'P2_LEMMA1', 'P2_LEMMA2', 'P2_LEMMA3', 'P2_LEMMA4',
     'P2_GENDER',
@@ -581,10 +595,10 @@ LIMIT 1`;
     const values = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || ''));
     const itemNames = APEX_ITEMS.join(',');
     const itemValues = values.join(',');
-    const url = `${APEX_BASE_URL}:${itemNames}:${itemValues}`;
+    const url = `${apexBaseUrl()}:${itemNames}:${itemValues}`;
 
     apexLinkEl.href = url;
-    apexLinkEl.classList.remove('disabled');
+    apexLinkEl.classList.toggle('disabled', !hasSession());
     apexPreviewEl.textContent = url;
     apexPreviewEl.classList.remove('hidden');
   }
@@ -600,14 +614,30 @@ LIMIT 1`;
     }
     const items  = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
     const values = [lid, 'Wikidata', currentQID, '100'].map(encodeURIComponent).join(',');
-    const url    = `${APEX_ND_BASE}:${items}:${values}`;
+    const url    = `${apexNdBase()}:${items}:${values}`;
     ndLinkEl.href = url;
-    ndLinkEl.classList.remove('disabled');
+    ndLinkEl.classList.toggle('disabled', !hasSession());
     ndPreviewEl.textContent = url;
     ndPreviewEl.classList.remove('hidden');
   }
 
   ndLidInput.addEventListener('input', buildNormdatumLink);
+
+  const sessionInput = document.getElementById('apex-session');
+  sessionInput.addEventListener('input', () => {
+    const raw = sessionInput.value.trim();
+    const match = raw.match(/f\?p=\d+:\d+:(\d+)/);
+    apexSession = match ? match[1] : (raw.match(/^\d+$/) ? raw : '0');
+    localStorage.setItem('apexSession', apexSession);
+    if (Object.keys(currentData).length) buildApexLink();
+    buildNormdatumLink();
+  });
+
+  const savedSession = localStorage.getItem('apexSession');
+  if (savedSession) {
+    apexSession = savedSession;
+    sessionInput.value = savedSession;
+  }
 
   /* ── Utility ── */
   function esc(str) {
@@ -616,6 +646,18 @@ LIMIT 1`;
     return d.innerHTML;
   }
 })();
+
+var amieWindow = null;
+function openAmie(url) {
+  if (url === '#') return false;
+  if (amieWindow && !amieWindow.closed) {
+    amieWindow.location.href = url;
+    amieWindow.focus();
+  } else {
+    amieWindow = window.open(url, 'amie');
+  }
+  return false;
+}
 </script>
 
 </body>
