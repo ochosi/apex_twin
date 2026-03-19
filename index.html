@@ -49,11 +49,33 @@
     }
 
     .search-wrapper {
-      position: relative;
-      max-width: 560px;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      max-width: 620px;
     }
 
-    .search-wrapper input {
+    #mode-select {
+      padding: .75rem .75rem;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      outline: none;
+      cursor: pointer;
+      transition: border-color .15s;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+
+    #mode-select:focus { border-color: var(--accent); }
+
+    .search-input-wrapper {
+      position: relative;
+      flex: 1;
+    }
+
+    .search-input-wrapper input {
       width: 100%;
       padding: .75rem 1rem .75rem 2.5rem;
       font-size: 1rem;
@@ -64,9 +86,9 @@
       transition: border-color .15s;
     }
 
-    .search-wrapper input:focus { border-color: var(--accent); }
+    .search-input-wrapper input:focus { border-color: var(--accent); }
 
-    .search-wrapper .icon {
+    .search-input-wrapper .icon {
       position: absolute;
       left: .75rem;
       top: 50%;
@@ -315,9 +337,15 @@
 
   <div id="main-content" class="locked">
   <div class="search-wrapper">
-    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="search" placeholder="Search for a historical person&hellip;" autocomplete="off">
-    <div class="dropdown" id="dropdown"></div>
+    <select id="mode-select">
+      <option value="people">People</option>
+      <option value="places">Places</option>
+    </select>
+    <div class="search-input-wrapper">
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search" placeholder="Search for a historical person&hellip;" autocomplete="off">
+      <div class="dropdown" id="dropdown"></div>
+    </div>
   </div>
 
   <div class="columns">
@@ -333,6 +361,20 @@
         <div class="field"><label>Gender</label><div class="value" data-field="sexDisplay"></div></div>
         <div class="field"><label>Date of Birth</label><div class="value" data-field="dob"></div></div>
         <div class="field"><label>Date of Death</label><div class="value" data-field="dod"></div></div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="location-detail-card">
+      <h2 id="location-name">Location Details</h2>
+      <div id="location-wiki-id" class="wiki-id hidden"></div>
+      <div id="location-loading" class="status-msg hidden"><span class="spinner"></span> Loading details&hellip;</div>
+      <div id="location-empty-state" class="status-msg">Search for a location above to see its details.</div>
+      <div id="location-fields" class="field-grid hidden">
+        <div class="field"><label>Location Name (Lemma1)</label><div class="value" id="loc-name-value"></div></div>
+        <div class="field"><label>Coordinates</label><div class="value" id="loc-coords-value"></div></div>
+      </div>
+      <div id="location-map" class="hidden" style="margin-top:1rem;">
+        <iframe id="loc-map-iframe" width="100%" height="220" style="border:1px solid var(--border);border-radius:var(--radius);" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
     </div>
 
@@ -355,16 +397,16 @@
           <input type="text" id="nd-lid" placeholder="Paste the LID here&hellip;" autocomplete="off">
         </div>
         <div class="inline-field">
-          <label>Wikidata ID</label>
+          <label id="nd-data-label">Wikidata ID</label>
           <div id="nd-qid-display" class="readonly-value empty">&mdash;</div>
         </div>
         <div class="inline-field">
           <label>Art</label>
-          <div class="readonly-value">Wikidata</div>
+          <div id="nd-art-display" class="readonly-value">Wikidata</div>
         </div>
         <div class="inline-field">
           <label>Gewissheit</label>
-          <div class="readonly-value">gewiss</div>
+          <div id="nd-gewissheit-display" class="readonly-value">gewiss</div>
         </div>
       </div>
       <a id="nd-apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Open Normdatum in AMIE</a>
@@ -429,9 +471,64 @@
   const ndLinkEl      = document.getElementById('nd-apex-link');
   const ndPreviewEl   = document.getElementById('nd-url-preview');
 
+  const modeSelect        = document.getElementById('mode-select');
+  const detailCard        = document.getElementById('detail-card');
+  const locationCard      = document.getElementById('location-detail-card');
+  const locationNameEl    = document.getElementById('location-name');
+  const locationWikiIdEl  = document.getElementById('location-wiki-id');
+  const locationLoadingEl = document.getElementById('location-loading');
+  const locationEmptyEl   = document.getElementById('location-empty-state');
+  const locationFieldsEl  = document.getElementById('location-fields');
+  const locNameValue      = document.getElementById('loc-name-value');
+  const locCoordsValue    = document.getElementById('loc-coords-value');
+  const locationMapEl     = document.getElementById('location-map');
+  const locMapIframe      = document.getElementById('loc-map-iframe');
+  const ndDataLabel       = document.getElementById('nd-data-label');
+  const ndArtDisplay      = document.getElementById('nd-art-display');
+  const ndGewissDisplay   = document.getElementById('nd-gewissheit-display');
+
   let debounceTimer = null;
   let currentData   = {};
   let currentQID    = '';
+  let currentMode   = 'people';
+  let currentCoords = '';
+
+  /* ── Mode toggle ── */
+  modeSelect.addEventListener('change', () => {
+    currentMode = modeSelect.value;
+    searchInput.value = '';
+    closeDropdown();
+    currentData = {};
+    currentQID = '';
+    currentCoords = '';
+
+    if (currentMode === 'people') {
+      searchInput.placeholder = 'Search for a historical person\u2026';
+      detailCard.classList.remove('hidden');
+      locationCard.classList.add('hidden');
+      showEmpty();
+      ndDataLabel.textContent = 'Wikidata ID';
+      ndArtDisplay.textContent = 'Wikidata';
+      ndGewissDisplay.textContent = 'gewiss';
+    } else {
+      searchInput.placeholder = 'Search for a location\u2026';
+      detailCard.classList.add('hidden');
+      locationCard.classList.remove('hidden');
+      showLocationEmpty();
+      ndDataLabel.textContent = 'Coordinates';
+      ndArtDisplay.textContent = 'Geodaten';
+      ndGewissDisplay.textContent = '100';
+    }
+
+    ndQidDisplay.textContent = '\u2014';
+    ndQidDisplay.classList.add('empty');
+    apexLinkEl.classList.add('disabled');
+    apexLinkEl.href = '#';
+    apexPreviewEl.classList.add('hidden');
+    ndLinkEl.classList.add('disabled');
+    ndLinkEl.href = '#';
+    ndPreviewEl.classList.add('hidden');
+  });
 
   /* ── Search (wbsearchentities) ── */
   searchInput.addEventListener('input', () => {
@@ -471,7 +568,11 @@
         const label = el.querySelector('.label').textContent;
         searchInput.value = label;
         closeDropdown();
-        fetchDetails(id, label);
+        if (currentMode === 'people') {
+          fetchPersonDetails(id, label);
+        } else {
+          fetchLocationDetails(id, label);
+        }
       });
     });
   }
@@ -483,7 +584,7 @@
   });
 
   /* ── Detail fetch (SPARQL) ── */
-  async function fetchDetails(qid, label) {
+  async function fetchPersonDetails(qid, label) {
     showLoading();
     const sparql = `
 SELECT ?nobleTitleLabel ?familyNameLabel ?givenNameLabel
@@ -613,13 +714,119 @@ LIMIT 1`;
     emptyEl.classList.remove('hidden');
   }
 
+  /* ── Location detail fetch (SPARQL) ── */
+  async function fetchLocationDetails(qid, label) {
+    showLocationLoading();
+    const sparql = `
+SELECT ?coords WHERE {
+  BIND(wd:${qid} AS ?item)
+  OPTIONAL { ?item wdt:P625 ?coords. }
+} LIMIT 1`;
+
+    try {
+      const url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(sparql);
+      const res = await fetch(url);
+      const json = await res.json();
+      const row = (json.results.bindings || [])[0] || {};
+
+      const coords = parseWktPoint(val(row.coords));
+
+      currentData = {
+        locationName: label,
+        coordinates: coords,
+        register: 'Orte',
+        bearbeiter: 'XCD',
+        sortField: removeDiacritics(label),
+      };
+      currentCoords = coords;
+      currentQID = qid;
+      renderLocationFields(qid, label);
+    } catch (err) {
+      console.error('SPARQL query failed:', err);
+      locationEmptyEl.textContent = 'Failed to load details. Please try again.';
+      showLocationEmpty();
+    }
+  }
+
+  function parseWktPoint(wkt) {
+    if (!wkt) return '';
+    const m = wkt.match(/Point\(([^ ]+) ([^ ]+)\)/i);
+    if (!m) return '';
+    return m[2] + ', ' + m[1];
+  }
+
+  function renderLocationFields(qid, label) {
+    locationNameEl.textContent = label;
+    locationWikiIdEl.innerHTML = `<a href="https://www.wikidata.org/wiki/${qid}" target="_blank" rel="noopener">${qid}</a>`;
+    locationWikiIdEl.classList.remove('hidden');
+
+    locNameValue.textContent = label;
+    locNameValue.classList.remove('empty');
+
+    const coords = currentData.coordinates || '';
+    locCoordsValue.textContent = coords || '\u2014';
+    locCoordsValue.classList.toggle('empty', !coords);
+
+    if (coords) {
+      locMapIframe.src = 'https://maps.google.com/maps?q=' + encodeURIComponent(coords) + '&z=12&output=embed';
+      locationMapEl.classList.remove('hidden');
+    } else {
+      locationMapEl.classList.add('hidden');
+      locMapIframe.src = '';
+    }
+
+    locationLoadingEl.classList.add('hidden');
+    locationEmptyEl.classList.add('hidden');
+    locationFieldsEl.classList.remove('hidden');
+
+    buildApexLink();
+
+    ndQidDisplay.textContent = coords || '\u2014';
+    ndQidDisplay.classList.toggle('empty', !coords);
+    buildNormdatumLink();
+  }
+
+  function showLocationLoading() {
+    locationFieldsEl.classList.add('hidden');
+    locationEmptyEl.classList.add('hidden');
+    locationMapEl.classList.add('hidden');
+    locMapIframe.src = '';
+    locationLoadingEl.classList.remove('hidden');
+    locationWikiIdEl.classList.add('hidden');
+    locationNameEl.textContent = 'Loading\u2026';
+    apexLinkEl.classList.add('disabled');
+    apexLinkEl.href = '#';
+    apexPreviewEl.classList.add('hidden');
+  }
+
+  function showLocationEmpty() {
+    locationFieldsEl.classList.add('hidden');
+    locationLoadingEl.classList.add('hidden');
+    locationMapEl.classList.add('hidden');
+    locMapIframe.src = '';
+    locationEmptyEl.classList.remove('hidden');
+  }
+
   /* ── APEX URL builder ── */
   function buildApexLink() {
-    const values = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || ''));
-    const itemNames = APEX_ITEMS.join(',');
-    const itemValues = values.join(',');
-    const url = `${apexBaseUrl()}:${itemNames}:${itemValues}`;
+    let itemNames, itemValues;
 
+    if (currentMode === 'places') {
+      const items = ['P2_LEMMA1', 'P2_REGISTER', 'P2_BEARBEITER', 'P2_SORTIERFELD'];
+      const vals  = [
+        currentData.locationName || '',
+        currentData.register || 'Orte',
+        currentData.bearbeiter || 'XCD',
+        currentData.sortField || '',
+      ].map(encodeURIComponent);
+      itemNames  = items.join(',');
+      itemValues = vals.join(',');
+    } else {
+      itemNames  = APEX_ITEMS.join(',');
+      itemValues = FIELD_KEYS.map(k => encodeURIComponent(currentData[k] || '')).join(',');
+    }
+
+    const url = `${apexBaseUrl()}:${itemNames}:${itemValues}`;
     apexLinkEl.href = url;
     apexLinkEl.classList.toggle('disabled', !hasSession());
     apexPreviewEl.textContent = url;
@@ -629,15 +836,21 @@ LIMIT 1`;
   /* ── Normdatum URL builder ── */
   function buildNormdatumLink() {
     const lid = ndLidInput.value.trim();
-    if (!lid || !currentQID) {
+    const hasData = currentMode === 'places' ? !!currentCoords : !!currentQID;
+    if (!lid || !hasData) {
       ndLinkEl.classList.add('disabled');
       ndLinkEl.href = '#';
       ndPreviewEl.classList.add('hidden');
       return;
     }
-    const items  = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
-    const values = [lid, 'Wikidata', currentQID, '100'].map(encodeURIComponent).join(',');
-    const url    = `${apexNdBase()}:${items}:${values}`;
+    const items = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
+    let values;
+    if (currentMode === 'places') {
+      values = [lid, 'Geodaten', currentCoords, '100'].map(encodeURIComponent).join(',');
+    } else {
+      values = [lid, 'Wikidata', currentQID, '100'].map(encodeURIComponent).join(',');
+    }
+    const url = `${apexNdBase()}:${items}:${values}`;
     ndLinkEl.href = url;
     ndLinkEl.classList.toggle('disabled', !hasSession());
     ndPreviewEl.textContent = url;
