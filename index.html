@@ -224,9 +224,67 @@
     .wiki-id a { color: var(--accent); text-decoration: none; }
     .wiki-id a:hover { text-decoration: underline; }
 
+    .normdatum-section {
+      margin-top: 2rem;
+    }
+
+    .normdatum-section .inline-fields {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .normdatum-section .inline-field {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .normdatum-section .inline-field label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text-secondary);
+      margin-bottom: .3rem;
+    }
+
+    .normdatum-section .inline-field input {
+      width: 100%;
+      padding: .6rem .75rem;
+      font-size: .95rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .normdatum-section .inline-field input:focus {
+      border-color: var(--accent);
+    }
+
+    .normdatum-section .readonly-value {
+      padding: .6rem .75rem;
+      font-size: .95rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      min-height: 2.45rem;
+    }
+
+    .normdatum-section .readonly-value.empty {
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
     @media (max-width: 768px) {
       .columns { grid-template-columns: 1fr; }
       .field-grid { grid-template-columns: 1fr; }
+      .normdatum-section .inline-fields { flex-direction: column; }
     }
   </style>
 </head>
@@ -268,12 +326,40 @@
       </div>
     </div>
   </div>
+
+  <div class="normdatum-section">
+    <div class="card">
+      <h2>Add Normdatum</h2>
+      <div class="inline-fields">
+        <div class="inline-field">
+          <label for="nd-lid">LID (from Step 1)</label>
+          <input type="text" id="nd-lid" placeholder="Paste the LID here&hellip;" autocomplete="off">
+        </div>
+        <div class="inline-field">
+          <label>Wikidata ID</label>
+          <div id="nd-qid-display" class="readonly-value empty">&mdash;</div>
+        </div>
+        <div class="inline-field">
+          <label>Art</label>
+          <div class="readonly-value">Wikidata</div>
+        </div>
+        <div class="inline-field">
+          <label>Gewissheit</label>
+          <div class="readonly-value">gewiss</div>
+        </div>
+      </div>
+      <a id="nd-apex-link" class="apex-link disabled" href="#" target="_blank" rel="noopener">Open Normdatum in AMIE</a>
+      <div id="nd-url-preview" class="apex-url-preview hidden"></div>
+    </div>
+  </div>
 </div>
 
 <script>
 (function () {
   /* ── APEX configuration ── */
-  const APEX_BASE_URL = 'https://apex.dla-marbach.de:55022/apex/f?p=150:2:5883423803655::NO:2';
+  const APEX_SESSION  = '5883423803655';
+  const APEX_BASE_URL = `https://apex.dla-marbach.de:55022/apex/f?p=150:2:${APEX_SESSION}::NO:2`;
+  const APEX_ND_BASE  = `https://apex.dla-marbach.de:55022/apex/f?p=150:14:${APEX_SESSION}::NO:14`;
   const APEX_ITEMS  = [
     'P2_LEMMA1', 'P2_LEMMA2', 'P2_LEMMA3', 'P2_LEMMA4',
     'P2_GENDER',
@@ -301,8 +387,14 @@
   const apexLinkEl    = document.getElementById('apex-link');
   const apexPreviewEl = document.getElementById('apex-url-preview');
 
+  const ndLidInput    = document.getElementById('nd-lid');
+  const ndQidDisplay  = document.getElementById('nd-qid-display');
+  const ndLinkEl      = document.getElementById('nd-apex-link');
+  const ndPreviewEl   = document.getElementById('nd-url-preview');
+
   let debounceTimer = null;
   let currentData   = {};
+  let currentQID    = '';
 
   /* ── Search (wbsearchentities) ── */
   searchInput.addEventListener('input', () => {
@@ -401,6 +493,7 @@ LIMIT 1`;
         sortField:  removeDiacritics([familyName, givenName, dobParts.year].filter(Boolean).join(' ')),
       };
 
+      currentQID = qid;
       renderFields(qid, label);
     } catch (err) {
       console.error('SPARQL query failed:', err);
@@ -460,6 +553,10 @@ LIMIT 1`;
     fieldsEl.classList.remove('hidden');
 
     buildApexLink();
+
+    ndQidDisplay.textContent = qid;
+    ndQidDisplay.classList.remove('empty');
+    buildNormdatumLink();
   }
 
   function showLoading() {
@@ -491,6 +588,26 @@ LIMIT 1`;
     apexPreviewEl.textContent = url;
     apexPreviewEl.classList.remove('hidden');
   }
+
+  /* ── Normdatum URL builder ── */
+  function buildNormdatumLink() {
+    const lid = ndLidInput.value.trim();
+    if (!lid || !currentQID) {
+      ndLinkEl.classList.add('disabled');
+      ndLinkEl.href = '#';
+      ndPreviewEl.classList.add('hidden');
+      return;
+    }
+    const items  = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
+    const values = [lid, 'Wikidata', currentQID, '100'].map(encodeURIComponent).join(',');
+    const url    = `${APEX_ND_BASE}:${items}:${values}`;
+    ndLinkEl.href = url;
+    ndLinkEl.classList.remove('disabled');
+    ndPreviewEl.textContent = url;
+    ndPreviewEl.classList.remove('hidden');
+  }
+
+  ndLidInput.addEventListener('input', buildNormdatumLink);
 
   /* ── Utility ── */
   function esc(str) {
