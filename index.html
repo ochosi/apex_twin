@@ -48,12 +48,7 @@
     }
 
     .header-login .apex-link {
-      display: inline-block;
       padding: .45rem 1rem;
-      font-size: .85rem;
-      margin-top: 0;
-      white-space: nowrap;
-      flex-shrink: 0;
     }
 
     .header-login input {
@@ -168,9 +163,6 @@
     }
 
     .columns {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 1.5rem;
       margin-top: 1.5rem;
     }
 
@@ -188,6 +180,10 @@
       margin-bottom: 1rem;
       padding-bottom: .5rem;
       border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
     }
 
     .field-grid {
@@ -214,20 +210,20 @@
 
     .field .value.empty { color: var(--text-secondary); font-style: italic; }
 
-    .apex-section { position: sticky; top: 2rem; }
 
     .apex-link {
-      display: block;
+      display: inline-block;
       text-align: center;
-      padding: .85rem 1.5rem;
+      padding: .4rem 1rem;
       background: var(--accent);
       color: #fff;
       text-decoration: none;
       border-radius: var(--radius);
       font-weight: 600;
-      font-size: 1rem;
+      font-size: .85rem;
       transition: background .15s;
-      margin-top: 1rem;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .apex-link:hover { background: var(--accent-hover); }
@@ -238,18 +234,6 @@
       pointer-events: none;
     }
 
-    .apex-url-preview {
-      margin-top: .75rem;
-      padding: .75rem;
-      background: var(--bg);
-      border-radius: var(--radius);
-      font-size: .75rem;
-      font-family: "SF Mono", "Fira Code", monospace;
-      word-break: break-all;
-      color: var(--text-secondary);
-      max-height: 180px;
-      overflow-y: auto;
-    }
 
     .spinner {
       display: inline-block;
@@ -346,7 +330,6 @@
     }
 
     @media (max-width: 768px) {
-      .columns { grid-template-columns: 1fr; }
       .field-grid { grid-template-columns: 1fr; }
       .normdatum-section .inline-fields { flex-direction: column; }
       .header-login { width: 100%; }
@@ -381,7 +364,7 @@
 
   <div class="columns">
     <div class="card" id="detail-card">
-      <h2 id="person-name">Person Details</h2>
+      <h2><span id="person-name">Person Details</span> <a id="apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Create</a></h2>
       <div id="wiki-id" class="wiki-id hidden"></div>
       <div id="loading" class="status-msg hidden"><span class="spinner"></span> Loading details&hellip;</div>
       <div id="empty-state" class="status-msg">Search for someone above to see their details.</div>
@@ -396,7 +379,7 @@
     </div>
 
     <div class="card hidden" id="location-detail-card">
-      <h2 id="location-name">Location Details</h2>
+      <h2><span id="location-name">Location Details</span> <a id="apex-link-loc" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Create</a></h2>
       <div id="location-wiki-id" class="wiki-id hidden"></div>
       <div id="location-loading" class="status-msg hidden"><span class="spinner"></span> Loading details&hellip;</div>
       <div id="location-empty-state" class="status-msg">Search for a location above to see its details.</div>
@@ -408,20 +391,11 @@
         <iframe id="loc-map-iframe" width="100%" height="220" style="border:1px solid var(--border);border-radius:var(--radius);" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
     </div>
-
-    <div class="apex-section">
-      <div class="card">
-        <h2>AMIE</h2>
-        <p style="font-size:.9rem;color:var(--text-secondary);">Select a person to generate a link that opens AMIE with a pre-filled form.</p>
-        <a id="apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Open in AMIE</a>
-        <div id="apex-url-preview" class="apex-url-preview hidden"></div>
-      </div>
-    </div>
   </div>
 
   <div class="normdatum-section">
     <div class="card">
-      <h2>Add Normdatum</h2>
+      <h2>Add Normdatum <a id="nd-apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Create</a></h2>
       <div class="inline-fields">
         <div class="inline-field">
           <label for="nd-lid">LID (from Step 1)</label>
@@ -440,8 +414,7 @@
           <div id="nd-gewissheit-display" class="readonly-value">gewiss</div>
         </div>
       </div>
-      <a id="nd-apex-link" class="apex-link disabled" href="#" onclick="return openAmie(this.href)">Open Normdatum in AMIE</a>
-      <div id="nd-url-preview" class="apex-url-preview hidden"></div>
+
     </div>
   </div>
   </div>
@@ -498,12 +471,11 @@
   const personNameEl  = document.getElementById('person-name');
   const wikiIdEl      = document.getElementById('wiki-id');
   const apexLinkEl    = document.getElementById('apex-link');
-  const apexPreviewEl = document.getElementById('apex-url-preview');
+  const apexLinkLocEl = document.getElementById('apex-link-loc');
 
   const ndLidInput    = document.getElementById('nd-lid');
   const ndQidDisplay  = document.getElementById('nd-qid-display');
   const ndLinkEl      = document.getElementById('nd-apex-link');
-  const ndPreviewEl   = document.getElementById('nd-url-preview');
 
   const modeSelect        = document.getElementById('mode-select');
   const detailCard        = document.getElementById('detail-card');
@@ -558,10 +530,10 @@
     ndQidDisplay.classList.add('empty');
     apexLinkEl.classList.add('disabled');
     apexLinkEl.href = '#';
-    apexPreviewEl.classList.add('hidden');
+    apexLinkLocEl.classList.add('disabled');
+    apexLinkLocEl.href = '#';
     ndLinkEl.classList.add('disabled');
     ndLinkEl.href = '#';
-    ndPreviewEl.classList.add('hidden');
   });
 
   /* ── Search (wbsearchentities) ── */
@@ -780,7 +752,6 @@ LIMIT 1`;
     personNameEl.textContent = 'Loading\u2026';
     apexLinkEl.classList.add('disabled');
     apexLinkEl.href = '#';
-    apexPreviewEl.classList.add('hidden');
   }
 
   function showEmpty() {
@@ -919,9 +890,8 @@ SELECT ?coords WHERE {
     locationLoadingEl.classList.remove('hidden');
     locationWikiIdEl.classList.add('hidden');
     locationNameEl.textContent = 'Loading\u2026';
-    apexLinkEl.classList.add('disabled');
-    apexLinkEl.href = '#';
-    apexPreviewEl.classList.add('hidden');
+    apexLinkLocEl.classList.add('disabled');
+    apexLinkLocEl.href = '#';
   }
 
   function showLocationEmpty() {
@@ -952,10 +922,9 @@ SELECT ?coords WHERE {
     }
 
     const url = `${apexBaseUrl()}:${itemNames}:${itemValues}`;
-    apexLinkEl.href = url;
-    apexLinkEl.classList.toggle('disabled', !hasSession());
-    apexPreviewEl.textContent = url;
-    apexPreviewEl.classList.remove('hidden');
+    const btn = currentMode === 'places' ? apexLinkLocEl : apexLinkEl;
+    btn.href = url;
+    btn.classList.toggle('disabled', !hasSession());
   }
 
   /* ── Normdatum URL builder ── */
@@ -965,7 +934,6 @@ SELECT ?coords WHERE {
     if (!lid || !hasData) {
       ndLinkEl.classList.add('disabled');
       ndLinkEl.href = '#';
-      ndPreviewEl.classList.add('hidden');
       return;
     }
     const items = 'P14_NLID,P14_ART,P14_NORMDATUM,P14_GEWISSHEIT';
@@ -978,8 +946,6 @@ SELECT ?coords WHERE {
     const url = `${apexNdBase()}:${items}:${values}`;
     ndLinkEl.href = url;
     ndLinkEl.classList.toggle('disabled', !hasSession());
-    ndPreviewEl.textContent = url;
-    ndPreviewEl.classList.remove('hidden');
   }
 
   ndLidInput.addEventListener('input', buildNormdatumLink);
