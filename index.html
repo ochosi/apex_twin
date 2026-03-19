@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wikidata to AMIE</title>
+  <title>APEX TWIN</title>
   <style>
     :root {
       --bg: #f5f6fa;
@@ -341,7 +341,7 @@
 <body>
 
 <header>
-  <h1>Wikidata <span>&rarr;</span> AMIE</h1>
+  <h1>APEX TWIN</h1>
   <div class="header-login">
     <input type="text" id="apex-session" placeholder="Paste AMIE URL to connect session&hellip;" autocomplete="off">
     <a id="login-btn" class="apex-link" href="https://apex.dla-marbach.de:55022/apex/f?p=150" onclick="return openAmie(this.href)" style="background:var(--text-secondary);">Login to AMIE</a>
@@ -499,6 +499,7 @@
   let currentQID    = '';
   let currentMode   = 'people';
   let currentCoords = '';
+  modeSelect.value  = 'people';
 
   /* ── Mode toggle ── */
   modeSelect.addEventListener('change', () => {
